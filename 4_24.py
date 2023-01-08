@@ -35,9 +35,13 @@ def rfc_cv(n_estimators, min_samples_split, max_features, data, targets):
     return cval.mean()
 
 
-def optimize_rfc(data, targets):
-    """ランダムフォレストのパラメータにベイズ最適化を適用."""
-    def rfc_crossval(n_estimators, min_samples_split, max_features):
+class Optimization():
+    def __init__(self, data, targets):
+        self.data = data
+        self.targets = targets
+    
+
+    def _rfc_crossval(self, n_estimators, min_samples_split, max_features):
         """ 
         RandomForestクロスバリデーションのラッパー
         n_estimatorsとmin_samples_splitを渡す前に，integerにキャストしていることに注目してほしい。さらにmax_featuresが(0, 1)の範囲外の値を取ることを避けるためにそれに応じてキャップされていることも確認している
@@ -46,28 +50,31 @@ def optimize_rfc(data, targets):
             n_estimators=int(n_estimators),
             min_samples_split=int(min_samples_split),
             max_features=max(min(max_features, 0.999), 1e-3),
-            data=data,
-            targets=targets,
+            data=self.data,
+            targets=self.targets,
         )
-    optimizer = BayesianOptimization(
-        f=rfc_crossval,
-        pbounds={
-            "n_estimators": (10, 250),
-            "min_samples_split": (2, 25),
-            "max_features": (0.1, 0.999),
-        },
-        random_state=1234,
-        verbose=2
-    )
-    optimizer.maximize(n_iter=10)
-    print("Final result:", optimizer.max)
     
-    return optimizer
+
+    def optimize_rfc(self):
+        optimizer = BayesianOptimization(
+            f=self._rfc_crossval,
+            pbounds={
+                "n_estimators": (10, 250),
+                "min_samples_split": (2, 25),
+                "max_features": (0.1, 0.999),
+            },
+            random_state=1234,
+            verbose=2
+        )
+        optimizer.maximize(n_iter=10)
+        print("Final result:", optimizer.max)
+        
+        return optimizer
 
 
 def main():
     seed = 2017
-    
+
     # データの読み込み
     df = pd.read_csv("data/Diabetes.csv")
     X = df.iloc[:,:8].values     # 独立変数
@@ -80,7 +87,8 @@ def main():
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=seed)
     
     print(Colours.green("--- Optimizing Random Forest ---"))
-    optimize_rfc(X_train, y_train)
+    optimization = Optimization(X_train, y_train)
+    optimization.optimize_rfc()
 
 
 if __name__ == '__main__':
